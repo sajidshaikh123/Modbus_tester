@@ -18,6 +18,19 @@ let modbusClient = new ModbusRTU();
 let isConnected = false;
 let currentConnectionType = null; // 'serial' or 'ethernet'
 let readInterval = null;
+
+// Function to create a fresh Modbus client
+function createFreshModbusClient() {
+    if (modbusClient && isConnected) {
+        try {
+            modbusClient.close(() => {});
+        } catch (e) {
+            // Ignore errors during close
+        }
+    }
+    modbusClient = new ModbusRTU();
+    isConnected = false;
+}
 let currentConfig = {
     serial: {
         port: 'COM1',
@@ -33,7 +46,8 @@ let currentConfig = {
     modbus: {
         slaveId: 1,
         startAddress: 0,
-        quantity: 10
+        quantity: 10,
+        registerType: 'holdingRegisters' // 'coils', 'discreteInputs', 'inputRegisters', 'holdingRegisters'
     },
     interval: 1000, // 1 second
     aliases: {} // Store address aliases: { address: "alias_name" }
@@ -59,10 +73,13 @@ app.post('/api/connect', async (req, res) => {
     try {
         const { type, config } = req.body;
         
-        // Disconnect if already connected
+        // Disconnect if already connected and create fresh client
         if (isConnected) {
             await disconnect();
         }
+        createFreshModbusClient();
+
+        console.log(`Attempting to connect via ${type}...`);
 
         currentConnectionType = type;
         
@@ -85,8 +102,24 @@ app.post('/api/connect', async (req, res) => {
             );
         }
 
-        modbusClient.setTimeout(5000);
+        // Set up error handlers for connection stability
+        modbusClient.on('error', (err) => {
+            console.log('Modbus client error:', err.message);
+            if (err.code === 'ECONNRESET' || err.code === 'ENOTCONN') {
+                console.log('Connection lost, will attempt to reconnect on next operation');
+                isConnected = false;
+                io.emit('connectionStatus', { connected: false, error: 'Connection lost' });
+            }
+        });
+
+        modbusClient.on('close', () => {
+            console.log('Modbus connection closed');
+            isConnected = false;
+            io.emit('connectionStatus', { connected: false });
+        });
+
         isConnected = true;
+        currentConnectionType = type;
         
         res.json({ success: true, message: `Connected via ${type}` });
         io.emit('connectionStatus', { connected: true, type });
@@ -123,15 +156,73 @@ async function disconnect() {
     }
 }
 
+// Reconnect to Modbus device (useful after connection loss)
+app.post('/api/reconnect', async (req, res) => {
+    try {
+        if (!currentConnectionType) {
+            return res.status(400).json({ success: false, error: 'No previous connection type found' });
+        }
+
+        console.log(`Attempting to reconnect via ${currentConnectionType}...`);
+        
+        // Create fresh client and reconnect
+        createFreshModbusClient();
+        
+        if (currentConnectionType === 'serial') {
+            await modbusClient.connectRTUBuffered(
+                currentConfig.serial.port,
+                {
+                    baudRate: currentConfig.serial.baudRate,
+                    dataBits: currentConfig.serial.dataBits,
+                    stopBits: currentConfig.serial.stopBits,
+                    parity: currentConfig.serial.parity
+                }
+            );
+        } else if (currentConnectionType === 'ethernet') {
+            await modbusClient.connectTCP(
+                currentConfig.ethernet.ip,
+                { port: currentConfig.ethernet.port }
+            );
+        }
+
+        // Set up error handlers again
+        modbusClient.on('error', (err) => {
+            console.log('Modbus client error:', err.message);
+            if (err.code === 'ECONNRESET' || err.code === 'ENOTCONN') {
+                console.log('Connection lost, will attempt to reconnect on next operation');
+                isConnected = false;
+                io.emit('connectionStatus', { connected: false, error: 'Connection lost' });
+            }
+        });
+
+        modbusClient.on('close', () => {
+            console.log('Modbus connection closed');
+            isConnected = false;
+            io.emit('connectionStatus', { connected: false });
+        });
+
+        isConnected = true;
+        
+        res.json({ success: true, message: `Reconnected via ${currentConnectionType}` });
+        io.emit('connectionStatus', { connected: true, type: currentConnectionType });
+    } catch (error) {
+        console.error('Reconnection failed:', error.message);
+        res.status(500).json({ success: false, error: error.message });
+        io.emit('connectionStatus', { connected: false, error: error.message });
+    }
+});
+
 // Update Modbus configuration
 app.post('/api/modbus-config', (req, res) => {
     try {
-        const { slaveId, startAddress, quantity } = req.body;
+        const { slaveId, startAddress, quantity, registerType } = req.body;
         currentConfig.modbus = {
             slaveId: slaveId || currentConfig.modbus.slaveId,
             startAddress: startAddress !== undefined ? startAddress : currentConfig.modbus.startAddress,
-            quantity: quantity || currentConfig.modbus.quantity
+            quantity: quantity || currentConfig.modbus.quantity,
+            registerType: registerType || currentConfig.modbus.registerType
         };
+        
         res.json({ success: true, config: currentConfig.modbus });
     } catch (error) {
         res.status(500).json({ success: false, error: error.message });
@@ -191,18 +282,55 @@ function startReading() {
             }
             
             modbusClient.setID(currentConfig.modbus.slaveId);
-            const data = await modbusClient.readHoldingRegisters(
-                currentConfig.modbus.startAddress,
-                currentConfig.modbus.quantity
-            );
+            let data;
+            
+            // Read different register types based on configuration
+            switch (currentConfig.modbus.registerType) {
+                case 'coils':
+                    data = await modbusClient.readCoils(
+                        currentConfig.modbus.startAddress,
+                        currentConfig.modbus.quantity
+                    );
+                    break;
+                case 'discreteInputs':
+                    data = await modbusClient.readDiscreteInputs(
+                        currentConfig.modbus.startAddress,
+                        currentConfig.modbus.quantity
+                    );
+                    break;
+                case 'inputRegisters':
+                    data = await modbusClient.readInputRegisters(
+                        currentConfig.modbus.startAddress,
+                        currentConfig.modbus.quantity
+                    );
+                    break;
+                case 'holdingRegisters':
+                default:
+                    data = await modbusClient.readHoldingRegisters(
+                        currentConfig.modbus.startAddress,
+                        currentConfig.modbus.quantity
+                    );
+                    break;
+            }
             
             io.emit('modbusData', {
                 success: true,
                 timestamp: new Date().toISOString(),
                 data: data.data,
-                buffer: data.buffer
+                buffer: data.buffer,
+                registerType: currentConfig.modbus.registerType
             });
         } catch (error) {
+            console.log('Read error:', error.message);
+            
+            // Handle connection errors
+            if (error.code === 'ECONNRESET' || error.code === 'ENOTCONN' || error.message.includes('not connected')) {
+                console.log('Connection lost during read, stopping automatic reading');
+                isConnected = false;
+                stopReading();
+                io.emit('connectionStatus', { connected: false, error: 'Connection lost during read' });
+            }
+            
             io.emit('modbusData', {
                 success: false,
                 timestamp: new Date().toISOString(),
@@ -219,7 +347,7 @@ function stopReading() {
     }
 }
 
-// Write single register
+// Write single register or coil
 app.post('/api/write-register', async (req, res) => {
     try {
         if (!isConnected) {
@@ -227,11 +355,118 @@ app.post('/api/write-register', async (req, res) => {
         }
         
         const { address, value } = req.body;
-        modbusClient.setID(currentConfig.modbus.slaveId);
-        await modbusClient.writeRegister(address, value);
+        const registerType = currentConfig.modbus.registerType;
         
-        res.json({ success: true, message: `Written value ${value} to address ${address}` });
-        io.emit('writeResult', { success: true, address, value });
+        // Check if write operation is supported for current register type
+        if (registerType !== 'holdingRegisters' && registerType !== 'coils') {
+            return res.status(400).json({ 
+                success: false, 
+                error: `Write operations not supported for ${registerType}. Only coils and holding registers can be written.` 
+            });
+        }
+        
+        modbusClient.setID(currentConfig.modbus.slaveId);
+        
+        if (registerType === 'coils') {
+            // For coils, value should be boolean (0 or 1)
+            const boolValue = Boolean(value);
+            await modbusClient.writeCoil(address, boolValue);
+            res.json({ success: true, message: `Written ${boolValue ? 'ON' : 'OFF'} to coil ${address}` });
+        } else {
+            // For holding registers
+            await modbusClient.writeRegister(address, value);
+            res.json({ success: true, message: `Written value ${value} to holding register ${address}` });
+        }
+        
+        io.emit('writeResult', { success: true, address, value, registerType });
+    } catch (error) {
+        console.error('Write register error:', error.message);
+        
+        // Handle connection errors
+        if (error.code === 'ECONNRESET' || error.code === 'ENOTCONN' || error.message.includes('not connected')) {
+            console.log('Connection lost during write operation');
+            isConnected = false;
+            io.emit('connectionStatus', { connected: false, error: 'Connection lost during write' });
+        }
+        
+        res.status(500).json({ success: false, error: error.message });
+        io.emit('writeResult', { success: false, error: error.message });
+    }
+});
+
+// Write string block to holding registers
+app.post('/api/write-string', async (req, res) => {
+    try {
+        if (!isConnected) {
+            return res.status(400).json({ success: false, error: 'Not connected to Modbus device' });
+        }
+        
+        const { startAddress, text, maxLength } = req.body;
+        const registerType = currentConfig.modbus.registerType;
+        
+        // String writes are only supported for holding registers
+        if (registerType !== 'holdingRegisters') {
+            return res.status(400).json({ 
+                success: false, 
+                error: 'String write operations are only supported for holding registers' 
+            });
+        }
+        
+        if (!text || typeof text !== 'string') {
+            return res.status(400).json({ success: false, error: 'Invalid text data' });
+        }
+        
+        if (text.length > maxLength) {
+            return res.status(400).json({ 
+                success: false, 
+                error: `Text too long. Maximum ${maxLength} characters allowed` 
+            });
+        }
+        
+        // Convert string to register values (2 characters per register)
+        // Add null terminator (0) at the end to indicate end of string
+        const textWithNull = text + '\0';
+        const registers = [];
+        
+        for (let i = 0; i < textWithNull.length; i += 2) {
+            const char1 = textWithNull.charCodeAt(i) || 0;
+            const char2 = textWithNull.charCodeAt(i + 1) || 0;
+            // Combine two characters into one 16-bit register (big-endian)
+            const registerValue = (char1 << 8) | char2;
+            registers.push(registerValue);
+        }
+        
+        if (registers.length === 0) {
+            return res.status(400).json({ success: false, error: 'No data to write' });
+        }
+        
+        modbusClient.setID(currentConfig.modbus.slaveId);
+        
+        // Write all registers
+        if (registers.length === 1) {
+            await modbusClient.writeRegister(startAddress, registers[0]);
+        } else {
+            await modbusClient.writeRegisters(startAddress, registers);
+        }
+        
+        res.json({ 
+            success: true, 
+            message: `String "${text}" with null terminator written to ${registers.length} register(s) starting at address ${startAddress}`,
+            registersWritten: registers.length,
+            startAddress: startAddress,
+            endAddress: startAddress + registers.length - 1,
+            textLength: text.length,
+            totalLength: textWithNull.length
+        });
+        
+        io.emit('writeResult', { 
+            success: true, 
+            startAddress, 
+            registersWritten: registers.length,
+            text,
+            registerType: 'string' 
+        });
+        
     } catch (error) {
         res.status(500).json({ success: false, error: error.message });
         io.emit('writeResult', { success: false, error: error.message });

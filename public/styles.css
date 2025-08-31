@@ -32,6 +32,36 @@ header {
 header h1 {
     font-size: 2.5em;
     font-weight: 300;
+    margin: 0;
+}
+
+.header-controls {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+}
+
+.config-controls {
+    display: flex;
+    gap: 10px;
+}
+
+.btn.config-btn {
+    background-color: rgba(255, 255, 255, 0.2);
+    color: white;
+    border: 2px solid rgba(255, 255, 255, 0.3);
+    padding: 8px 16px;
+    font-size: 14px;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.2s;
+    font-weight: 600;
+}
+
+.btn.config-btn:hover {
+    background-color: rgba(255, 255, 255, 0.3);
+    border-color: rgba(255, 255, 255, 0.5);
+    transform: translateY(-1px);
 }
 
 .status-indicator {
@@ -321,6 +351,16 @@ header h1 {
     color: #2d3748;
 }
 
+.data-item .value.on {
+    color: #dc3545; /* Red for ON */
+    font-weight: 800;
+}
+
+.data-item .value.off {
+    color: #007bff; /* Blue for OFF */
+    font-weight: 800;
+}
+
 .data-item .controls {
     position: absolute;
     top: 2px;
@@ -421,6 +461,58 @@ header h1 {
     font-size: 12px;
 }
 
+.write-warning {
+    background-color: #fff3cd;
+    border: 1px solid #ffeaa7;
+    border-radius: 6px;
+    padding: 12px;
+    margin-bottom: 15px;
+    color: #856404;
+}
+
+.write-warning p {
+    margin: 0;
+    font-size: 14px;
+}
+
+.string-info {
+    font-size: 12px;
+    color: #6c757d;
+    margin-top: 5px;
+    font-style: italic;
+}
+
+.string-info span {
+    font-weight: 600;
+    color: #667eea;
+}
+
+.form-group textarea {
+    width: 100%;
+    padding: 10px;
+    border: 2px solid #e2e8f0;
+    border-radius: 6px;
+    font-size: 14px;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    resize: vertical;
+    min-height: 80px;
+    transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.form-group textarea:focus {
+    outline: none;
+    border-color: #667eea;
+    box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+}
+
+.form-group small {
+    display: block;
+    font-size: 11px;
+    color: #6c757d;
+    margin-top: 2px;
+    font-style: italic;
+}
+
 /* Modal Styles */
 .modal {
     display: none;
@@ -488,6 +580,16 @@ header h1 {
     
     header h1 {
         font-size: 2em;
+    }
+    
+    .header-controls {
+        flex-direction: column;
+        gap: 15px;
+        width: 100%;
+    }
+    
+    .config-controls {
+        justify-content: center;
     }
     
     .main-content {

@@ -7,6 +7,7 @@ const serialSettings = document.getElementById('serialSettings');
 const ethernetSettings = document.getElementById('ethernetSettings');
 const connectBtn = document.getElementById('connectBtn');
 const disconnectBtn = document.getElementById('disconnectBtn');
+const reconnectBtn = document.getElementById('reconnectBtn');
 const refreshPortsBtn = document.getElementById('refreshPorts');
 const serialPortSelect = document.getElementById('serialPort');
 const connectionStatus = document.getElementById('connectionStatus');
@@ -22,6 +23,21 @@ const logContent = document.getElementById('logContent');
 const clearLogBtn = document.getElementById('clearLog');
 const lastUpdate = document.getElementById('lastUpdate');
 const responseStatus = document.getElementById('responseStatus');
+
+// Config save/load elements
+const saveConfigBtn = document.getElementById('saveConfig');
+const loadConfigBtn = document.getElementById('loadConfig');
+const fileInput = document.getElementById('fileInput');
+
+// String write elements
+const stringStartAddress = document.getElementById('stringStartAddress');
+const stringLength = document.getElementById('stringLength');
+const stringData = document.getElementById('stringData');
+const stringCharCount = document.getElementById('stringCharCount');
+const stringRegCount = document.getElementById('stringRegCount');
+const writeStringBtn = document.getElementById('writeString');
+const clearStringBtn = document.getElementById('clearString');
+const writeStringNotSupported = document.getElementById('writeStringNotSupported');
 
 // Modal elements
 const writeModal = document.getElementById('writeModal');
@@ -47,11 +63,41 @@ let currentData = [];
 let logEntries = [];
 let addressAliases = {};
 
+// Configuration storage for all register types
+let configurationData = {
+    serial: {
+        port: 'COM1',
+        baudRate: 9600,
+        dataBits: 8,
+        stopBits: 1,
+        parity: 'none'
+    },
+    ethernet: {
+        ip: '192.168.1.100',
+        port: 502
+    },
+    modbus: {
+        slaveId: 1,
+        startAddress: 0,
+        quantity: 10,
+        registerType: 'holdingRegisters'
+    },
+    interval: 1,
+    connectionType: 'serial',
+    aliases: {
+        coils: {},
+        discreteInputs: {},
+        inputRegisters: {},
+        holdingRegisters: {}
+    }
+};
+
 // Initialize application
 document.addEventListener('DOMContentLoaded', () => {
     setupEventListeners();
     loadSerialPorts();
     loadCurrentConfig();
+    updateStringInfo(); // Initialize string counter
 });
 
 function setupEventListeners() {
@@ -63,6 +109,7 @@ function setupEventListeners() {
     // Connection buttons
     connectBtn.addEventListener('click', connect);
     disconnectBtn.addEventListener('click', disconnect);
+    reconnectBtn.addEventListener('click', reconnect);
     refreshPortsBtn.addEventListener('click', loadSerialPorts);
 
     // Reading control buttons
@@ -74,11 +121,41 @@ function setupEventListeners() {
     updateConfigBtn.addEventListener('click', updateModbusConfig);
     updateIntervalBtn.addEventListener('click', updateInterval);
 
+    // Register type change
+    document.getElementById('registerType').addEventListener('change', (event) => {
+        // Save current aliases for the previous register type
+        const previousRegisterType = configurationData.modbus.registerType;
+        if (previousRegisterType) {
+            configurationData.aliases[previousRegisterType] = { ...addressAliases };
+        }
+        
+        // Load aliases for the new register type
+        const newRegisterType = event.target.value;
+        configurationData.modbus.registerType = newRegisterType;
+        addressAliases = { ...configurationData.aliases[newRegisterType] };
+        
+        updateWriteVisibility();
+        updateDataDisplay();
+        
+        addLogEntry('info', `Switched to ${newRegisterType} - ${Object.keys(addressAliases).length} aliases loaded`);
+    });
+
     // Write register button
     writeRegisterBtn.addEventListener('click', writeRegister);
 
     // Log clear button
     clearLogBtn.addEventListener('click', clearLog);
+
+    // Config save/load buttons
+    saveConfigBtn.addEventListener('click', saveConfiguration);
+    loadConfigBtn.addEventListener('click', () => fileInput.click());
+    fileInput.addEventListener('change', loadConfiguration);
+
+    // String write functionality
+    stringData.addEventListener('input', updateStringInfo);
+    stringLength.addEventListener('input', updateStringInfo);
+    writeStringBtn.addEventListener('click', writeStringBlock);
+    clearStringBtn.addEventListener('click', clearStringData);
 
     // Modal events
     modalClose.addEventListener('click', closeModal);
@@ -151,6 +228,7 @@ async function loadCurrentConfig() {
         document.getElementById('slaveId').value = config.modbus.slaveId;
         document.getElementById('startAddress').value = config.modbus.startAddress;
         document.getElementById('quantity').value = config.modbus.quantity;
+        document.getElementById('registerType').value = config.modbus.registerType || 'holdingRegisters';
         document.getElementById('readInterval').value = config.interval / 1000;
         
         // Update serial settings
@@ -166,10 +244,30 @@ async function loadCurrentConfig() {
         // Load aliases
         addressAliases = config.aliases || {};
         
+        // Initialize configuration data structure
+        const currentRegisterType = config.modbus.registerType || 'holdingRegisters';
+        configurationData = {
+            serial: { ...config.serial },
+            ethernet: { ...config.ethernet },
+            modbus: { ...config.modbus },
+            interval: config.interval / 1000,
+            connectionType: config.connectionType || 'serial',
+            aliases: {
+                coils: {},
+                discreteInputs: {},
+                inputRegisters: {},
+                holdingRegisters: {}
+            }
+        };
+        
+        // Set current aliases for the active register type
+        configurationData.aliases[currentRegisterType] = { ...addressAliases };
+        
         // Update UI state
         isConnected = config.connected;
         isReading = config.reading;
         updateUIState();
+        updateWriteVisibility();
         
         if (config.connected) {
             const connectionType = config.connectionType || 'unknown';
@@ -255,6 +353,31 @@ async function disconnect() {
     }
 }
 
+async function reconnect() {
+    try {
+        reconnectBtn.disabled = true;
+        reconnectBtn.textContent = 'Reconnecting...';
+        addLogEntry('info', 'Attempting to reconnect...');
+        
+        const response = await fetch('/api/reconnect', {
+            method: 'POST'
+        });
+        
+        const result = await response.json();
+        
+        if (result.success) {
+            addLogEntry('success', result.message);
+        } else {
+            addLogEntry('error', `Reconnect failed: ${result.error}`);
+        }
+    } catch (error) {
+        addLogEntry('error', `Reconnect failed: ${error.message}`);
+    } finally {
+        reconnectBtn.disabled = false;
+        reconnectBtn.textContent = 'Reconnect';
+    }
+}
+
 async function startReading() {
     try {
         const response = await fetch('/api/start-reading', {
@@ -308,7 +431,8 @@ async function updateModbusConfig() {
     const config = {
         slaveId: parseInt(document.getElementById('slaveId').value),
         startAddress: parseInt(document.getElementById('startAddress').value),
-        quantity: parseInt(document.getElementById('quantity').value)
+        quantity: parseInt(document.getElementById('quantity').value),
+        registerType: document.getElementById('registerType').value
     };
     
     try {
@@ -323,10 +447,11 @@ async function updateModbusConfig() {
         const result = await response.json();
         
         if (result.success) {
-            addLogEntry('success', 'Modbus configuration updated');
+            addLogEntry('success', `Modbus configuration updated - Type: ${config.registerType}`);
             // Clear current data when config changes
             currentData = [];
             updateDataDisplay();
+            updateWriteVisibility();
         } else {
             addLogEntry('error', result.error);
         }
@@ -385,8 +510,24 @@ async function writeRegister() {
 }
 
 function openWriteModal(address, currentValue) {
+    const registerType = document.getElementById('registerType').value;
+    
     modalAddress.value = address;
-    modalValue.value = currentValue;
+    
+    if (registerType === 'coils') {
+        modalValue.value = currentValue ? 1 : 0;
+        modalValue.max = 1;
+        modalValue.min = 0;
+        modalValue.step = 1;
+        document.querySelector('label[for="modalValue"]').textContent = 'New Value (0=OFF, 1=ON):';
+    } else {
+        modalValue.value = currentValue;
+        modalValue.max = 65535;
+        modalValue.min = 0;
+        modalValue.step = 1;
+        document.querySelector('label[for="modalValue"]').textContent = 'New Value:';
+    }
+    
     writeModal.style.display = 'block';
 }
 
@@ -433,6 +574,7 @@ async function confirmWrite() {
 async function confirmAlias() {
     const address = parseInt(aliasAddress.value);
     const alias = aliasName.value.trim();
+    const currentRegisterType = document.getElementById('registerType').value;
     
     try {
         const response = await fetch('/api/set-alias', {
@@ -447,8 +589,10 @@ async function confirmAlias() {
         
         if (result.success) {
             addressAliases = result.aliases;
+            // Also update the configuration storage for current register type
+            configurationData.aliases[currentRegisterType] = { ...addressAliases };
             updateDataDisplay();
-            addLogEntry('success', `Alias ${alias ? 'set' : 'removed'} for address ${address}`);
+            addLogEntry('success', `Alias ${alias ? 'set' : 'removed'} for address ${address} (${currentRegisterType})`);
             closeAliasModal();
         } else {
             addLogEntry('error', result.error);
@@ -460,6 +604,7 @@ async function confirmAlias() {
 
 async function removeAlias() {
     const address = parseInt(aliasAddress.value);
+    const currentRegisterType = document.getElementById('registerType').value;
     
     try {
         const response = await fetch(`/api/alias/${address}`, {
@@ -470,8 +615,10 @@ async function removeAlias() {
         
         if (result.success) {
             addressAliases = result.aliases;
+            // Also update the configuration storage for current register type
+            configurationData.aliases[currentRegisterType] = { ...addressAliases };
             updateDataDisplay();
-            addLogEntry('success', `Alias removed for address ${address}`);
+            addLogEntry('success', `Alias removed for address ${address} (${currentRegisterType})`);
             closeAliasModal();
         } else {
             addLogEntry('error', result.error);
@@ -513,7 +660,8 @@ function handleModbusData(data) {
         readingStatus.textContent = 'Reading';
         readingStatus.className = 'status reading';
         
-        addLogEntry('success', `Read ${data.data.length} registers: [${data.data.join(', ')}]`);
+        const registerTypeName = getRegisterTypeName(data.registerType || 'holdingRegisters');
+        addLogEntry('success', `Read ${data.data.length} ${registerTypeName}: [${data.data.join(', ')}]`);
     } else {
         responseStatus.textContent = `Error: ${data.error}`;
         responseStatus.style.color = '#dc3545';
@@ -521,11 +669,31 @@ function handleModbusData(data) {
     }
 }
 
+function getRegisterTypeName(registerType) {
+    switch (registerType) {
+        case 'coils':
+            return 'coils';
+        case 'discreteInputs':
+            return 'discrete inputs';
+        case 'inputRegisters':
+            return 'input registers';
+        case 'holdingRegisters':
+            return 'holding registers';
+        default:
+            return 'registers';
+    }
+}
+
 function handleWriteResult(result) {
     if (result.success) {
-        addLogEntry('success', `Successfully wrote value ${result.value} to address ${result.address}`);
+        let message = `Successfully wrote value ${result.value} to address ${result.address}`;
+        if (result.retries && result.retries > 0) {
+            message += ` (after ${result.retries} retry${result.retries > 1 ? 'ies' : ''})`;
+        }
+        addLogEntry('success', message);
     } else {
         addLogEntry('error', `Write failed: ${result.error}`);
+        
     }
 }
 
@@ -547,6 +715,7 @@ function updateDataDisplay() {
     }
     
     const startAddress = parseInt(document.getElementById('startAddress').value) || 0;
+    const registerType = document.getElementById('registerType').value;
     
     currentData.forEach((value, index) => {
         const address = startAddress + index;
@@ -554,19 +723,49 @@ function updateDataDisplay() {
         const dataItem = document.createElement('div');
         dataItem.className = 'data-item';
         
+        // Format address display based on register type
+        let addressPrefix = '';
+        switch (registerType) {
+            case 'coils':
+                addressPrefix = '0x';
+                break;
+            case 'discreteInputs':
+                addressPrefix = '1x';
+                break;
+            case 'inputRegisters':
+                addressPrefix = '3x';
+                break;
+            case 'holdingRegisters':
+                addressPrefix = '4x';
+                break;
+        }
+        
+        // Format value display based on register type
+        let displayValue = value;
+        let valueClass = '';
+        if (registerType === 'coils' || registerType === 'discreteInputs') {
+            displayValue = value ? 'ON' : 'OFF';
+            valueClass = value ? 'on' : 'off';
+        }
+        
         dataItem.innerHTML = `
             ${alias ? `<div class="alias">${alias}</div>` : ''}
-            <div class="address">Addr: ${address}</div>
-            <div class="value">${value}</div>
+            <div class="address">${addressPrefix}${address.toString().padStart(5, '0')}</div>
+            <div class="value ${valueClass}">${displayValue}</div>
             <div class="controls">
                 <button class="control-btn alias-btn" title="Set Alias" onclick="event.stopPropagation(); openAliasModal(${address})">A</button>
             </div>
         `;
         
         dataItem.addEventListener('click', (event) => {
-            // Only open write modal if clicking on the data item itself, not on control buttons
+            // Only open write modal if clicking on the data item itself and write is supported
             if (!event.target.classList.contains('control-btn')) {
-                openWriteModal(address, value);
+                const writeSupported = registerType === 'holdingRegisters' || registerType === 'coils';
+                if (writeSupported) {
+                    openWriteModal(address, value);
+                } else {
+                    addLogEntry('info', `Write operations not supported for ${registerType}`);
+                }
             }
         });
         
@@ -578,14 +777,15 @@ function updateUIState() {
     // Connection buttons
     connectBtn.disabled = isConnected;
     disconnectBtn.disabled = !isConnected;
+    reconnectBtn.disabled = isConnected; // Only enable when disconnected
     
     // Reading buttons
     startReadingBtn.disabled = !isConnected || isReading;
     stopReadingBtn.disabled = !isConnected || !isReading;
     singleReadBtn.disabled = !isConnected || isReading;
     
-    // Write button
-    writeRegisterBtn.disabled = !isConnected;
+    // Write button - depends on connection and register type
+    updateWriteVisibility();
     
     // Update reading status display
     if (!isConnected) {
@@ -597,6 +797,56 @@ function updateUIState() {
     } else {
         readingStatus.textContent = 'Stopped';
         readingStatus.className = 'status stopped';
+    }
+}
+
+function updateWriteVisibility() {
+    const registerType = document.getElementById('registerType').value;
+    const writeNotSupported = document.getElementById('writeNotSupported');
+    const writeRegisterBtn = document.getElementById('writeRegister');
+    const writeAddressInput = document.getElementById('writeAddress');
+    const writeValueInput = document.getElementById('writeValue');
+    
+    // Check if register type supports write operations
+    const writeSupported = registerType === 'holdingRegisters' || registerType === 'coils';
+    const stringWriteSupported = registerType === 'holdingRegisters';
+    
+    if (writeSupported) {
+        writeNotSupported.style.display = 'none';
+        writeRegisterBtn.disabled = !isConnected;
+        writeAddressInput.disabled = false;
+        writeValueInput.disabled = false;
+        
+        // Update value input constraints for coils
+        if (registerType === 'coils') {
+            writeValueInput.max = '1';
+            writeValueInput.min = '0';
+            writeValueInput.placeholder = '0 (OFF) or 1 (ON)';
+        } else {
+            writeValueInput.max = '65535';
+            writeValueInput.min = '0';
+            writeValueInput.placeholder = '0-65535';
+        }
+    } else {
+        writeNotSupported.style.display = 'block';
+        writeRegisterBtn.disabled = true;
+        writeAddressInput.disabled = true;
+        writeValueInput.disabled = true;
+    }
+    
+    // Handle string write visibility
+    if (stringWriteSupported) {
+        writeStringNotSupported.style.display = 'none';
+        writeStringBtn.disabled = !isConnected;
+        stringStartAddress.disabled = false;
+        stringLength.disabled = false;
+        stringData.disabled = false;
+    } else {
+        writeStringNotSupported.style.display = 'block';
+        writeStringBtn.disabled = true;
+        stringStartAddress.disabled = true;
+        stringLength.disabled = true;
+        stringData.disabled = true;
     }
 }
 
@@ -617,4 +867,198 @@ function addLogEntry(type, message) {
 
 function clearLog() {
     logContent.innerHTML = '<p>Log cleared...</p>';
+}
+
+function updateStringInfo() {
+    const text = stringData.value;
+    const maxLength = parseInt(stringLength.value) || 0;
+    const charCount = text.length;
+    // Add 1 for null terminator that will be automatically added
+    const totalCharsWithNull = charCount + 1;
+    const regCount = Math.ceil(totalCharsWithNull / 2);
+    const maxRegCount = Math.ceil(maxLength / 2);
+    
+    stringCharCount.textContent = `${charCount} (+1 null)`;
+    stringRegCount.textContent = regCount;
+    
+    // Update character count color based on limit (including null terminator)
+    if (totalCharsWithNull > maxLength) {
+        stringCharCount.style.color = '#dc3545';
+        stringRegCount.style.color = '#dc3545';
+    } else {
+        stringCharCount.style.color = '#667eea';
+        stringRegCount.style.color = '#667eea';
+    }
+    
+    // Update max length constraint
+    stringData.maxLength = maxLength;
+}
+
+function clearStringData() {
+    stringData.value = '';
+    updateStringInfo();
+}
+
+async function writeStringBlock() {
+    const startAddress = parseInt(stringStartAddress.value);
+    const text = stringData.value;
+    const maxLength = parseInt(stringLength.value);
+    
+    if (!text) {
+        addLogEntry('error', 'Please enter text to write');
+        return;
+    }
+    
+    // Check if text + null terminator exceeds max length
+    if (text.length + 1 > maxLength) {
+        addLogEntry('error', `Text too long. Maximum ${maxLength - 1} characters allowed (reserving 1 for null terminator)`);
+        return;
+    }
+    
+    try {
+        const response = await fetch('/api/write-string', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ 
+                startAddress, 
+                text, 
+                maxLength 
+            })
+        });
+        
+        const result = await response.json();
+        
+        if (result.success) {
+            addLogEntry('success', `String "${text}" with null terminator written to registers ${startAddress}-${startAddress + result.registersWritten - 1} (${result.registersWritten} registers, ${result.textLength} chars + null)`);
+        } else {
+            addLogEntry('error', result.error);
+        }
+    } catch (error) {
+        addLogEntry('error', `Failed to write string: ${error.message}`);
+    }
+}
+
+function saveConfiguration() {
+    try {
+        // Collect current form values
+        const currentConfig = {
+            serial: {
+                port: document.getElementById('serialPort').value,
+                baudRate: parseInt(document.getElementById('baudRate').value),
+                dataBits: parseInt(document.getElementById('dataBits').value),
+                stopBits: parseInt(document.getElementById('stopBits').value),
+                parity: document.getElementById('parity').value
+            },
+            ethernet: {
+                ip: document.getElementById('ipAddress').value,
+                port: parseInt(document.getElementById('tcpPort').value)
+            },
+            modbus: {
+                slaveId: parseInt(document.getElementById('slaveId').value),
+                startAddress: parseInt(document.getElementById('startAddress').value),
+                quantity: parseInt(document.getElementById('quantity').value),
+                registerType: document.getElementById('registerType').value
+            },
+            interval: parseFloat(document.getElementById('readInterval').value),
+            connectionType: document.querySelector('input[name="connectionType"]:checked').value,
+            aliases: {
+                coils: configurationData.aliases.coils || {},
+                discreteInputs: configurationData.aliases.discreteInputs || {},
+                inputRegisters: configurationData.aliases.inputRegisters || {},
+                holdingRegisters: configurationData.aliases.holdingRegisters || {}
+            },
+            timestamp: new Date().toISOString(),
+            version: '1.0'
+        };
+
+        // Update current aliases for active register type
+        const currentRegisterType = document.getElementById('registerType').value;
+        currentConfig.aliases[currentRegisterType] = { ...addressAliases };
+
+        // Create and download JSON file
+        const configJson = JSON.stringify(currentConfig, null, 2);
+        const blob = new Blob([configJson], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `modbus-config-${new Date().toISOString().slice(0, 19).replace(/:/g, '-')}.json`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+
+        addLogEntry('success', 'Configuration saved successfully');
+    } catch (error) {
+        addLogEntry('error', `Failed to save configuration: ${error.message}`);
+    }
+}
+
+function loadConfiguration(event) {
+    const file = event.target.files[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = function(e) {
+        try {
+            const config = JSON.parse(e.target.result);
+            
+            // Validate configuration structure
+            if (!config.serial || !config.ethernet || !config.modbus || !config.aliases) {
+                throw new Error('Invalid configuration file format');
+            }
+
+            // Update form fields
+            document.getElementById('serialPort').value = config.serial.port || 'COM1';
+            document.getElementById('baudRate').value = config.serial.baudRate || 9600;
+            document.getElementById('dataBits').value = config.serial.dataBits || 8;
+            document.getElementById('stopBits').value = config.serial.stopBits || 1;
+            document.getElementById('parity').value = config.serial.parity || 'none';
+
+            document.getElementById('ipAddress').value = config.ethernet.ip || '192.168.1.100';
+            document.getElementById('tcpPort').value = config.ethernet.port || 502;
+
+            document.getElementById('slaveId').value = config.modbus.slaveId || 1;
+            document.getElementById('startAddress').value = config.modbus.startAddress || 0;
+            document.getElementById('quantity').value = config.modbus.quantity || 10;
+            document.getElementById('registerType').value = config.modbus.registerType || 'holdingRegisters';
+            document.getElementById('readInterval').value = config.interval || 1;
+
+            // Set connection type
+            const connectionType = config.connectionType || 'serial';
+            document.querySelector(`input[name="connectionType"][value="${connectionType}"]`).checked = true;
+            toggleConnectionSettings();
+
+            // Load aliases for all register types
+            configurationData.aliases = {
+                coils: config.aliases.coils || {},
+                discreteInputs: config.aliases.discreteInputs || {},
+                inputRegisters: config.aliases.inputRegisters || {},
+                holdingRegisters: config.aliases.holdingRegisters || {}
+            };
+
+            // Load aliases for current register type
+            const currentRegisterType = config.modbus.registerType || 'holdingRegisters';
+            addressAliases = { ...configurationData.aliases[currentRegisterType] };
+
+            // Update UI
+            updateWriteVisibility();
+            updateDataDisplay();
+
+            addLogEntry('success', `Configuration loaded successfully (${config.timestamp ? new Date(config.timestamp).toLocaleString() : 'Unknown date'})`);
+            
+            // Show loaded configuration summary
+            const summary = `Loaded: ${connectionType.toUpperCase()}, ${config.modbus.registerType}, ${Object.keys(addressAliases).length} aliases`;
+            addLogEntry('info', summary);
+
+        } catch (error) {
+            addLogEntry('error', `Failed to load configuration: ${error.message}`);
+        }
+    };
+    
+    reader.readAsText(file);
+    // Clear the input so the same file can be loaded again
+    event.target.value = '';
 }
