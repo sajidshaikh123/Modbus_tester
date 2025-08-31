@@ -1,0 +1,22 @@
+{
+  "name": "modbus-tester",
+  "version": "1.0.0",
+  "description": "Modbus RTU over Serial and Ethernet testing application",
+  "main": "app.js",
+  "scripts": {
+    "start": "node app.js",
+    "dev": "nodemon app.js"
+  },
+  "keywords": ["modbus", "rtu", "serial", "ethernet", "testing"],
+  "author": "Your Name",
+  "license": "MIT",
+  "dependencies": {
+    "express": "^4.18.2",
+    "socket.io": "^4.7.2",
+    "modbus-serial": "^8.0.17",
+    "serialport": "^12.0.0"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.1"
+  }
+}

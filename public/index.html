@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Modbus RTU Tester</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Modbus RTU Tester</h1>
+            <div class="status-indicator">
+                <span id="connectionStatus" class="status disconnected">Disconnected</span>
+                <span id="readingStatus" class="status stopped">Stopped</span>
+            </div>
+        </header>
+
+        <div class="main-content">
+            <!-- Connection Settings -->
+            <div class="panel">
+                <h2>Connection Settings</h2>
+                
+                <div class="connection-type">
+                    <label>
+                        <input type="radio" name="connectionType" value="serial" checked>
+                        Serial (RTU)
+                    </label>
+                    <label>
+                        <input type="radio" name="connectionType" value="ethernet">
+                        Ethernet (TCP)
+                    </label>
+                </div>
+
+                <!-- Serial Settings -->
+                <div id="serialSettings" class="connection-settings">
+                    <h3>Serial Settings</h3>
+                    <div class="form-group">
+                        <label for="serialPort">COM Port:</label>
+                        <select id="serialPort">
+                            <option value="COM1">COM1</option>
+                        </select>
+                        <button id="refreshPorts" type="button">Refresh</button>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="baudRate">Baud Rate:</label>
+                            <select id="baudRate">
+                                <option value="9600" selected>9600</option>
+                                <option value="19200">19200</option>
+                                <option value="38400">38400</option>
+                                <option value="57600">57600</option>
+                                <option value="115200">115200</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="dataBits">Data Bits:</label>
+                            <select id="dataBits">
+                                <option value="7">7</option>
+                                <option value="8" selected>8</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="stopBits">Stop Bits:</label>
+                            <select id="stopBits">
+                                <option value="1" selected>1</option>
+                                <option value="2">2</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="parity">Parity:</label>
+                            <select id="parity">
+                                <option value="none" selected>None</option>
+                                <option value="even">Even</option>
+                                <option value="odd">Odd</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Ethernet Settings -->
+                <div id="ethernetSettings" class="connection-settings" style="display: none;">
+                    <h3>Ethernet Settings</h3>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="ipAddress">IP Address:</label>
+                            <input type="text" id="ipAddress" value="192.168.1.100" placeholder="192.168.1.100">
+                        </div>
+                        <div class="form-group">
+                            <label for="tcpPort">Port:</label>
+                            <input type="number" id="tcpPort" value="502" placeholder="502">
+                        </div>
+                    </div>
+                </div>
+
+                <div class="form-actions">
+                    <button id="connectBtn" class="btn primary">Connect</button>
+                    <button id="disconnectBtn" class="btn secondary" disabled>Disconnect</button>
+                </div>
+            </div>
+
+            <!-- Modbus Settings -->
+            <div class="panel">
+                <h2>Modbus Settings</h2>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="slaveId">Slave ID:</label>
+                        <input type="number" id="slaveId" value="1" min="1" max="247">
+                    </div>
+                    <div class="form-group">
+                        <label for="startAddress">Start Address:</label>
+                        <input type="number" id="startAddress" value="0" min="0" max="65535">
+                    </div>
+                    <div class="form-group">
+                        <label for="quantity">Quantity:</label>
+                        <input type="number" id="quantity" value="10" min="1" max="125">
+                    </div>
+                    <div class="form-group">
+                        <label for="readInterval">Read Interval (sec):</label>
+                        <input type="number" id="readInterval" value="1" min="0.1" max="60" step="0.1">
+                    </div>
+                </div>
+                <div class="form-actions">
+                    <button id="updateConfig" class="btn primary">Update Config</button>
+                    <button id="updateInterval" class="btn secondary">Update Interval</button>
+                </div>
+            </div>
+
+            <!-- Reading Controls -->
+            <div class="panel">
+                <h2>Reading Controls</h2>
+                <div class="form-actions">
+                    <button id="startReading" class="btn success" disabled>Start Reading</button>
+                    <button id="stopReading" class="btn warning" disabled>Stop Reading</button>
+                    <button id="singleRead" class="btn info" disabled>Single Read</button>
+                </div>
+            </div>
+
+            <!-- Write Register -->
+            <div class="panel">
+                <h2>Write Register</h2>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="writeAddress">Address:</label>
+                        <input type="number" id="writeAddress" value="0" min="0" max="65535">
+                    </div>
+                    <div class="form-group">
+                        <label for="writeValue">Value:</label>
+                        <input type="number" id="writeValue" value="0" min="0" max="65535">
+                    </div>
+                    <div class="form-group">
+                        <button id="writeRegister" class="btn primary" disabled>Write</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Data Display -->
+        <div class="data-panel">
+            <h2>Modbus Data</h2>
+            <div class="data-header">
+                <span class="last-update">Last Update: <span id="lastUpdate">Never</span></span>
+                <span class="response-status">Status: <span id="responseStatus">-</span></span>
+            </div>
+            <div class="data-container">
+                <div class="data-grid" id="dataGrid">
+                    <!-- Data will be populated here -->
+                </div>
+                <div class="data-log" id="dataLog">
+                    <h3>Log</h3>
+                    <div class="log-content" id="logContent">
+                        <p>Ready to read data...</p>
+                    </div>
+                    <button id="clearLog" class="btn secondary">Clear Log</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Write Value Modal -->
+    <div id="writeModal" class="modal">
+        <div class="modal-content">
+            <span class="close">&times;</span>
+            <h2>Write Register Value</h2>
+            <div class="form-group">
+                <label for="modalAddress">Address:</label>
+                <input type="number" id="modalAddress" readonly>
+            </div>
+            <div class="form-group">
+                <label for="modalValue">New Value:</label>
+                <input type="number" id="modalValue" min="0" max="65535">
+            </div>
+            <div class="modal-actions">
+                <button id="confirmWrite" class="btn primary">Write</button>
+                <button id="cancelWrite" class="btn secondary">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Alias Modal -->
+    <div id="aliasModal" class="modal">
+        <div class="modal-content">
+            <span class="close-alias">&times;</span>
+            <h2>Set Address Alias</h2>
+            <div class="form-group">
+                <label for="aliasAddress">Address:</label>
+                <input type="number" id="aliasAddress" readonly>
+            </div>
+            <div class="form-group">
+                <label for="aliasName">Alias Name:</label>
+                <input type="text" id="aliasName" placeholder="Enter alias name (e.g., Temperature, Pressure)" maxlength="20">
+            </div>
+            <div class="modal-actions">
+                <button id="confirmAlias" class="btn primary">Set Alias</button>
+                <button id="removeAlias" class="btn warning">Remove Alias</button>
+                <button id="cancelAlias" class="btn secondary">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="/socket.io/socket.io.js"></script>
+    <script src="script.js"></script>
+</body>
+</html>
