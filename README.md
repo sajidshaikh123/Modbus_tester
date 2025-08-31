@@ -1,83 +1,73 @@
-# Modbus RTU Tester
+# Modbus RTU/TCP Tester
 
-A comprehensive Node.js application for testing Modbus RTU communication over both Serial (RS485/RS232) and Ethernet connections with advanced address aliasing functionality.
+A comprehensive Node.js application for testing Modbus RTU/TCP communication with advanced features including serial/ethernet support, address aliasing, register type selection, string writing, and robust connection recovery.
 
-## Features
+## 🚀 Features
 
-✅ **All Requested Features Implemented:**
+### **Core Communication Features**
+- **Serial (RTU) Support**: RS485/RS232 communication with full COM port configuration
+- **Ethernet (TCP) Support**: TCP/IP Modbus communication with configurable IP and port
+- **Dynamic Connection Switching**: Seamless switching between serial and ethernet modes
+- **Connection Recovery**: Automatic detection and recovery from connection drops (ECONNRESET handling)
+- **Real-time Status**: Live connection status and data updates via WebSocket
 
-1. **Change Serial COM Port and Settings**
-   - Dynamic detection of available COM ports with refresh functionality
-   - Configurable baud rate (9600, 19200, 38400, 57600, 115200)
-   - Configurable data bits (7, 8)
-   - Configurable stop bits (1, 2)
-   - Configurable parity (None, Even, Odd)
+### **Modbus Register Support**
+- **All Register Types**: Support for Coils (0x), Discrete Inputs (1x), Input Registers (3x), and Holding Registers (4x)
+- **Register Type Dropdown**: Easy selection between different Modbus function codes
+- **Configurable Range**: Start address (0-65535) and quantity (1-125) settings
+- **Real-time Reading**: Configurable read intervals (0.1-60 seconds)
 
-2. **Change Ethernet IP Address and Port**
-   - Configurable IP address for Modbus TCP server
-   - Configurable TCP port (default: 502)
-   - Real-time connection switching between Serial and Ethernet
+### **Advanced Write Operations**
+- **Single Register Write**: Click any data cell to write new values
+- **String Block Write**: Write text strings to consecutive holding registers
+- **Null Terminator Support**: Automatic null termination for string data
+- **Write Validation**: Type-specific write operation validation
+- **Immediate Feedback**: Real-time write operation results
 
-3. **Text Editor for Modbus Configuration**
-   - Modbus slave ID (1-247)
-   - Start address (0-65535)
-   - Number of registers to read (1-125)
-   - Real-time configuration updates
+### **Address Aliasing System**
+- **Custom Names**: Assign meaningful names to Modbus addresses (e.g., "Temperature", "Motor Speed")
+- **Persistent Aliases**: Aliases maintained per register type throughout session
+- **Visual Display**: Aliases prominently displayed with addresses still visible
+- **Easy Management**: Simple click-to-edit alias functionality
+- **Configuration Save/Load**: Aliases included in configuration exports
 
-4. **Facility to Update Register Values**
-   - Click on any data cell to open write popup
-   - Modal dialog for entering new values
-   - Write single register functionality
-   - Immediate feedback on write operations
+### **User Interface Features**
+- **Responsive Design**: Professional web interface that works on all devices
+- **Real-time Updates**: Live data display with automatic refresh
+- **Color-coded Status**: Visual indicators for ON/OFF states and connection status
+- **Comprehensive Logging**: Detailed operation logs with timestamps
+- **Configuration Management**: Save and load complete configuration sets as JSON
 
-5. **Set Modbus Data Read Interval**
-   - Configurable read interval in seconds (0.1-60)
-   - Real-time interval updates
-   - Automatic restart with new timing
-
-6. **Display Response Status**
-   - Success/Error status display
-   - Detailed error messages
-   - Real-time connection status
-   - Comprehensive logging system with timestamps
-
-7. **🆕 Address Aliasing System**
-   - Assign custom names to Modbus addresses (e.g., "Temperature", "Pressure", "Motor Speed")
-   - Aliases displayed prominently while keeping addresses visible
-   - Easy alias management with hover controls
-   - Real-time alias updates across all connected clients
-   - Persistent alias storage during session
+### **Connection Management**
+- **Smart Reconnection**: Automatic reconnection capability after connection loss
+- **Error Recovery**: Graceful handling of communication errors
+- **Fresh Client Creation**: Clean connection reestablishment for stability
+- **Connection Monitoring**: Real-time detection of connection drops
 
 ## Additional Features
 
 - **Real-time Web Interface**: Modern, responsive design that works on desktop and mobile
-- **Live Data Grid**: Visual display of all register values with customizable aliases
-- **Address Aliasing**: Name your addresses with meaningful labels (e.g., "Tank Level", "Pump Status")
-- **Hover Controls**: Intuitive interface with alias management controls that appear on demand
-- **Comprehensive Logging**: Timestamped log entries with color-coded success/error indication
-- **Connection Management**: Easy connect/disconnect with real-time status indicators
-- **Single Read Option**: One-time read functionality for testing individual operations
-- **Background Reading**: Continuous data reading with configurable intervals
-- **Socket.IO Integration**: Real-time updates without page refresh
-- **Cross-platform Compatibility**: Works on Windows, Linux, and macOS
-- **Mobile Responsive**: Optimized interface for tablets and smartphones
+## 🛠 Installation
 
-## Installation
+### Prerequisites
+- **Node.js** (v14 or higher) - Download from [nodejs.org](https://nodejs.org/)
+- **Serial Port Access** (for RTU communication) - Ensure proper drivers are installed
+- **Network Access** (for TCP communication) - Firewall configuration may be needed
 
-1. **Clone or download** this project to your local machine
+### Setup Steps
 
-2. **Install Node.js** (if not already installed)
-   - Download from: https://nodejs.org/
-   - Choose LTS version
+1. **Clone or download** this project:
+   ```bash
+   git clone <repository-url>
+   cd Modbus_tester
+   ```
 
-3. **Install dependencies**:
+2. **Install dependencies**:
    ```bash
    npm install
    ```
 
-## Usage
-
-1. **Start the application**:
+3. **Start the application**:
    ```bash
    npm start
    ```
@@ -87,55 +77,107 @@ A comprehensive Node.js application for testing Modbus RTU communication over bo
    npm run dev
    ```
 
-2. **Open your web browser** and navigate to:
-   ```
-   http://localhost:3000
-   ```
+4. **Access the application**:
+   Open your web browser and navigate to: `http://localhost:3000`
 
-3. **Configure Connection**:
-   - Choose Serial (RTU) or Ethernet (TCP)
-   - For Serial: Select COM port and configure settings
-   - For Ethernet: Enter IP address and port
+## 📖 Usage Guide
 
-4. **Configure Modbus Settings**:
-   - Set Slave ID
-   - Set Start Address
-   - Set Number of registers to read
-   - Set Read Interval
+### **Initial Setup**
+1. **Choose Connection Type**: Select Serial (RTU) or Ethernet (TCP) using radio buttons
+2. **Configure Connection Parameters**:
+   - **Serial**: Select COM port, baud rate, data bits, stop bits, parity
+   - **Ethernet**: Enter IP address and port number
+3. **Set Modbus Parameters**: Slave ID, start address, quantity, register type
+4. **Connect**: Click the "Connect" button to establish communication
 
-5. **Connect and Test**:
-   - Click "Connect" to establish connection
-   - Click "Start Reading" for continuous data monitoring
-   - Click on any data cell to write new values
-   - Use alias controls to name your addresses
-   - Monitor status and logs in real-time
+### **Reading Data**
+1. **Start Continuous Reading**: Click "Start Reading" for automatic data updates
+2. **Single Read**: Use "Single Read" for one-time data retrieval
+3. **Adjust Interval**: Change read interval in real-time (0.1-60 seconds)
+4. **Monitor Status**: Watch connection and reading status indicators
 
-## Using Address Aliases
+### **Writing Data**
+1. **Single Register Write**: Click any data cell to open write dialog
+2. **String Block Write**: Use the string write panel for text data
+   - Enter text in the textarea
+   - Automatic null termination for C-style strings
+   - Real-time character and register count display
+3. **Write Validation**: Only supported register types allow write operations
 
-The application now supports naming your Modbus addresses with meaningful aliases:
+### **Address Aliasing**
+1. **Set Aliases**: Click the "A" button next to any address
+2. **Manage Names**: Enter meaningful names like "Temperature", "Motor Speed"
+### **Connection Recovery**
+1. **Automatic Detection**: Application automatically detects connection drops
+2. **Manual Reconnection**: Use the "Reconnect" button to restore connection
+3. **Fresh Client Creation**: Each reconnection uses a clean client instance
+4. **Error Handling**: Graceful handling of ECONNRESET and similar errors
 
-### Setting Aliases
-1. **Start reading data** from your Modbus device
-2. **Hover over any data cell** - an "A" button will appear
-3. **Click the "A" button** to open the alias management dialog
-4. **Enter a descriptive name** (e.g., "Motor Speed", "Tank Level", "Temperature")
-5. **Click "Set Alias"** to save the name
+## 🔧 Technical Details
 
-### Managing Aliases
-- **Update**: Click the "A" button again and enter a new name
-- **Remove**: Click "Remove Alias" in the alias dialog
-- **View**: Aliases appear prominently above the address in each data cell
+### **Supported Modbus Functions**
+- **01 - Read Coils**: Read multiple coil status (0x references)
+- **02 - Read Discrete Inputs**: Read input status (1x references)  
+- **03 - Read Holding Registers**: Read multiple holding registers (4x references)
+- **04 - Read Input Registers**: Read multiple input registers (3x references)
+- **05 - Write Single Coil**: Write single coil value
+- **06 - Write Single Register**: Write single holding register
+- **16 - Write Multiple Registers**: Write string blocks to holding registers
 
-### Example Display
-```
-┌─────────────────┐
-│   Temperature   │  ← Your custom alias (blue)
-│    Addr: 40001  │  ← Original address (gray)
-│      2450       │  ← Current value (large)
-└─────────────────┘
-```
+### **String Writing Features**
+- **Automatic Null Termination**: Strings automatically get null terminator (\\0)
+- **Character Encoding**: 2 characters per 16-bit register (big-endian)
+- **Length Validation**: Ensures string + null terminator fits in specified length
+- **Visual Feedback**: Real-time character count with null terminator indication
+- **Register Calculation**: Automatic register count calculation
 
-### Benefits
+### **Connection Types**
+- **Serial RTU**: RS485/RS232 with full parameter configuration
+- **Ethernet TCP**: Standard Modbus TCP over IP networks
+- **Dynamic Switching**: Change connection types without restart
+
+### **Error Handling**
+- **Connection Recovery**: Automatic detection and recovery from dropped connections
+- **ECONNRESET Handling**: Graceful handling of server-side connection resets
+- **Timeout Management**: Built-in timeout handling with meaningful error messages
+- **Retry Logic**: Configurable retry mechanisms for robust communication
+
+## 📱 User Interface
+
+### **Responsive Design**
+- **Desktop Optimized**: Full-featured interface for desktop browsers
+- **Mobile Friendly**: Touch-optimized controls for tablets and phones
+- **Real-time Updates**: Live data refresh via WebSocket connections
+- **Professional Styling**: Clean, modern interface with intuitive controls
+
+### **Data Visualization**
+- **Grid Layout**: Organized display of register values
+- **Color Coding**: Visual indicators for ON/OFF states and connection status
+- **Address Formatting**: Proper Modbus address formatting (0x, 1x, 3x, 4x prefixes)
+- **Alias Integration**: Seamless display of custom names with addresses
+
+### **Logging System**
+- **Timestamped Entries**: All operations logged with precise timestamps
+- **Color-coded Messages**: Success (green), errors (red), info (blue)
+- **Detailed Information**: Comprehensive operation details and results
+- **Auto-scroll**: Latest entries automatically visible
+
+## 🔍 Troubleshooting
+
+### **Connection Issues**
+- **Serial Problems**: Check COM port availability, driver installation, cable connections
+- **Ethernet Problems**: Verify IP address, port number, network connectivity, firewall settings
+- **ECONNRESET Errors**: Use the reconnect feature, check server-side connection limits
+
+### **Data Reading Issues**
+- **Timeout Errors**: Verify slave ID, check device responsiveness, ensure correct register addresses
+- **Invalid Data**: Confirm register type matches device configuration
+- **No Response**: Check physical connections, power supply, communication parameters
+
+### **String Writing Issues**
+- **Length Errors**: Ensure text + null terminator fits within specified max length
+- **Encoding Problems**: Verify device expects ASCII encoding and big-endian format
+- **Write Failures**: Confirm device supports write operations on target registers
 - **Industrial Applications**: Use meaningful names like "Pump Status", "Flow Rate"
 - **Team Collaboration**: Everyone sees the same descriptive names
 - **Quick Identification**: No need to remember what each address represents
@@ -155,77 +197,119 @@ Modbus_tester/
 ```
 
 ## Dependencies
+## 📦 Dependencies
 
-- **express**: Web server framework
-- **socket.io**: Real-time bidirectional communication
-- **modbus-serial**: Modbus RTU/TCP library
-- **serialport**: Serial port communication
+### **Core Dependencies**
+- **express** (^4.18.2): Web server framework for REST API and static file serving
+- **socket.io** (^4.7.5): Real-time bidirectional communication between client and server
+- **modbus-serial** (^8.0.17): Comprehensive Modbus RTU/TCP communication library
+- **serialport** (^12.0.0): Cross-platform serial port access for RTU communication
 
-## API Endpoints
+### **Development Dependencies**
+- **nodemon** (^3.0.2): Auto-restart server during development
 
-- `GET /api/serial-ports` - Get available serial ports
-- `POST /api/connect` - Connect to Modbus device
-- `POST /api/disconnect` - Disconnect from device
-- `POST /api/modbus-config` - Update Modbus configuration
-- `POST /api/interval` - Update read interval
-- `POST /api/start-reading` - Start continuous reading
-- `POST /api/stop-reading` - Stop continuous reading
-- `POST /api/write-register` - Write single register
-- `GET /api/config` - Get current configuration
-- `POST /api/set-alias` - Set or update address alias
-- `GET /api/aliases` - Get all current aliases
+## 🌐 API Reference
+
+### **Connection Management**
+- `GET /api/serial-ports` - Retrieve available COM ports with device information
+- `POST /api/connect` - Establish connection to Modbus device (serial or ethernet)
+- `POST /api/disconnect` - Gracefully disconnect from current device
+- `POST /api/reconnect` - Reconnect using last successful connection parameters
+
+### **Configuration**
+- `POST /api/modbus-config` - Update Modbus parameters (slave ID, addresses, register type)
+- `POST /api/interval` - Modify read interval for continuous monitoring
+- `GET /api/config` - Retrieve current complete configuration
+
+### **Data Operations**
+- `POST /api/start-reading` - Begin continuous data reading with configured interval
+- `POST /api/stop-reading` - Stop continuous data reading
+- `POST /api/write-register` - Write single register or coil value
+- `POST /api/write-string` - Write string block with automatic null termination
+
+### **Alias Management**
+- `POST /api/set-alias` - Create or update address alias
+- `GET /api/aliases` - Retrieve all current aliases for active register type
 - `DELETE /api/alias/:address` - Remove specific address alias
 
-## Socket.IO Events
+### **Socket.IO Events**
+- `connectionStatus` - Real-time connection state updates
+- `modbusData` - Live data updates from continuous reading
+- `writeResult` - Write operation results and feedback
+- `aliasUpdated` - Address alias change notifications
 
-- `connectionStatus` - Connection state updates
-- `modbusData` - Real-time data updates
-- `writeResult` - Write operation results
-- `aliasUpdated` - Address alias changes
+## 🎯 Use Cases
 
-## Troubleshooting
+### **Industrial Automation**
+- Monitor PLC registers and I/O status
+- Test HMI communication interfaces
+- Debug Modbus device configurations
+- Validate automation system communications
 
-### Serial Connection Issues
-- Ensure the COM port is not being used by another application
-- Check cable connections and RS485/RS232 wiring
-- Verify baud rate and other serial settings match your device
-- On Windows, check Device Manager for correct COM port numbers
+### **Device Development**
+- Test embedded Modbus implementations
+- Verify register mappings and data formats
+- Debug communication protocols
+- Validate string handling in devices
 
-### Ethernet Connection Issues
-- Verify IP address and port of Modbus TCP server
-- Check network connectivity
-- Ensure firewall is not blocking the connection
-- Verify the target device supports Modbus TCP
+### **System Integration**
+- Test network connectivity between devices
+- Verify Modbus gateway configurations
+- Debug serial communication issues
+- Validate TCP/IP Modbus implementations
 
-### Permission Issues
-- On Linux/Mac, you may need to add your user to the dialout group for serial access
-- Run with appropriate permissions for serial port access
+### **Educational & Training**
+- Learn Modbus protocol fundamentals
+- Practice industrial communication concepts
+- Demonstrate real-time data acquisition
+- Understand register addressing schemes
 
-### Alias Issues
-- Aliases are stored in memory and will be lost when the server restarts
-- If aliases don't appear, check the browser console for JavaScript errors
-- Ensure you're hovering over the data cells to see the alias controls
-- Maximum alias length is 20 characters to maintain layout
+## 🚨 Known Limitations
 
-## Common Use Cases
+- **Session Storage**: Aliases are stored in memory and reset on server restart
+- **Single Client**: Optimized for single user, multiple concurrent users may conflict
+- **Register Limits**: Respects Modbus protocol limits (125 registers max per read)
+- **Platform Dependencies**: Serial communication requires platform-specific drivers
 
-### Industrial Applications
-- **Temperature Sensors**: "Furnace_Temp", "Ambient_Temp", "Coolant_Temp"
-- **Motor Controls**: "Pump_Speed", "Fan_RPM", "Conveyor_Speed"
-- **Tank Monitoring**: "Water_Level", "Oil_Pressure", "Tank_Volume"
-- **Process Variables**: "Flow_Rate", "Pressure_PSI", "Valve_Position"
+## 🔮 Future Enhancements
 
-### Testing and Development
-- **Register Mapping**: Quickly identify what each address represents
-- **Team Communication**: Share meaningful names across development team
-- **Documentation**: Generate clear reports with named parameters
-- **Debugging**: Maintain technical address info while using friendly names
+- **Database Storage**: Persistent alias and configuration storage
+- **Multi-user Support**: Session management for multiple concurrent users
+- **Data Logging**: Historical data storage and export capabilities
+- **Advanced Diagnostics**: Communication statistics and performance metrics
+- **Protocol Extensions**: Support for additional Modbus variants and custom functions
 
-## License
+## 📄 License
 
-MIT License - feel free to use and modify as needed.
+MIT License - Feel free to use, modify, and distribute as needed.
 
-## Support
+## 📞 Support & Contributing
+
+### **Getting Help**
+- Check the troubleshooting section above for common issues
+- Review the console logs in both browser and server terminal
+- Verify hardware connections and device configurations
+- Test with known working Modbus devices first
+
+### **Reporting Issues**
+- Provide detailed error messages and console logs
+- Include connection type, device details, and configuration used
+- Specify operating system and Node.js version
+- Describe expected vs actual behavior
+
+### **Contributing**
+- Fork the repository and create feature branches
+- Follow existing code style and structure
+- Test thoroughly with both serial and ethernet connections
+- Update documentation for new features
+
+## 🎉 Acknowledgments
+
+This application was developed to provide a comprehensive, user-friendly tool for Modbus communication testing and monitoring. Special thanks to the Node.js community and the maintainers of the excellent libraries that made this project possible.
+
+---
+
+**Happy Modbus Testing!** 🚀
 
 For issues or questions:
 1. Check the browser console for error messages
